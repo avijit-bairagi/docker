@@ -1,0 +1,93 @@
+version: '3.7'
+
+services:
+  mysql:
+    image: mysql/mysql-server:5.7
+    environment:
+      MYSQL_DATABASE: 'change_me'
+      MYSQL_ROOT_PASSWORD: 'change_me'
+      MYSQL_ROOT_HOST: '%'
+    ports:
+      - '3306:3306'
+    expose:
+      - '3306'
+
+  prometheus:
+    image: prom/prometheus:v2.47.1
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - prometheus-net
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+
+  ipt-redis:
+    image: redis
+    container_name: ipt_redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - "./volume/rabbitmq/data/:/data/lib/rabbitmq/"
+      - "./volume/rabbitmq/log/:/data/log/rabbitmq"
+    networks:
+      - rabbitmq_go_net
+
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: change_me
+      POSTGRES_PASSWORD: change_me
+    volumes:
+      - ./volume/postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566"
+      - "4571:4571"
+    environment:
+      - SERVICES=dynamodb,kinesis,ssm,s3,sqs
+      - DEFAULT_REGION=us-east-1
+    volumes:
+      - "./localstack:/var/lib/localstack"
+
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin
+    container_name: dynamodb-admin
+    ports:
+      - "8001:8001"
+    environment:
+      - DYNAMO_ENDPOINT=http://localstack:4566
+    depends_on:
+      - localstack
+
+networks:
+  rabbitmq_go_net:
+    driver: bridge
+  prometheus-net:
+    driver: bridge
+
+volumes:
+  localstack:
